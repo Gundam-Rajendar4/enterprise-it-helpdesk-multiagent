@@ -1,0 +1,17 @@
+Hardware Troubleshooting Knowledge Base
+
+Monitor not turning on:
+1. Confirm power cable is connected at both monitor and wall outlet
+2. Confirm the outlet itself works (test with another device)
+3. Check the monitor's power button was actually pressed
+4. Try a different video cable (HDMI/DisplayPort) if monitor powers on
+   but shows no signal
+5. If monitor still fails, submit a hardware replacement request via
+   the IT Asset Portal
+
+Laptop not charging:
+1. Check charger cable and adapter for visible damage
+2. Try a different power outlet
+3. Restart the laptop
+4. If issue persists, this may indicate battery or charging port failure
+   - escalate to Hardware team

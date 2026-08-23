@@ -1,0 +1,15 @@
+Network and Access Knowledge Base
+
+Cannot access shared drive:
+1. Confirm you are connected to company VPN if working remotely
+2. Confirm your account has been granted access to that specific drive
+   - this is an Access Request, not a Network Issue, if access was
+     never granted in the first place
+3. Try accessing via the full network path rather than mapped drive
+4. If previously working and now failing, this may be a Network Issue
+   - check VPN connection status first
+
+Access Requests:
+New access to shared drives, folders, or systems must be requested via
+the Access Request Portal and approved by the resource owner before
+access is granted. Typical approval time: 1-2 business days.

@@ -1,12 +1,9 @@
 """
 resolver_agent.py
 ------------------
-This is our SECOND agent in the Enterprise IT Helpdesk Multi-Agent System.
-
-Job of this agent: Given a ticket description AND its category (decided by
-the triage agent), suggest a first-line resolution step. This mimics a real
-helpdesk workflow — once a ticket is categorized, the next person (or agent)
-suggests what to actually do about it.
+UPDATED for Day 3: Now uses retrieved knowledge (RAG) instead of relying
+purely on the LLM's raw training. This makes suggestions grounded in
+OUR company's actual documented procedures, not generic guesses.
 """
 
 from langchain_ollama import OllamaLLM
@@ -14,21 +11,23 @@ from langchain_ollama import OllamaLLM
 llm = OllamaLLM(model="llama3.2")
 
 
-def resolve_ticket(ticket_description: str, category: str) -> str:
+def resolve_ticket(ticket_description: str, category: str, knowledge: str) -> str:
     """
-    Takes the ticket description AND the category (from the triage agent)
-    and returns a suggested first resolution step.
-
-    Notice: this function needs TWO inputs, not one. That's because it
-    depends on the triage agent's output — this is the "handoff" in action.
+    Takes the ticket, category, AND retrieved knowledge (from ChromaDB),
+    and suggests a resolution step GROUNDED in that knowledge - not just
+    the LLM guessing from memory.
     """
 
     prompt = f"""You are an IT Helpdesk resolution assistant.
-A ticket has already been categorized. Suggest ONE clear, short first
-troubleshooting step a support agent should try.
+Use ONLY the knowledge base content below to suggest ONE clear first
+troubleshooting step. Do not invent steps that aren't supported by the
+knowledge base.
 
 Category: {category}
 Ticket: "{ticket_description}"
+
+Knowledge Base Content:
+{knowledge}
 
 Respond in ONE short sentence only. No explanations, no extra text."""
 
@@ -38,16 +37,15 @@ Respond in ONE short sentence only. No explanations, no extra text."""
     return suggestion
 
 
-# Quick standalone test — only runs if this file is executed directly
 if __name__ == "__main__":
-    test_cases = [
-        ("I forgot my password and can't log into my laptop.", "Password Reset"),
-        ("My monitor won't turn on even though it's plugged in.", "Hardware Issue"),
-    ]
+    sample_knowledge = """Password Reset Knowledge Base
+To reset a forgotten password, go to portal.company.com/reset and
+enter your registered work email. Never attempt repeated logins -
+accounts lock after 5 failed attempts."""
 
-    print("=== Resolver Agent — Test Run ===\n")
-    for ticket, category in test_cases:
-        suggestion = resolve_ticket(ticket, category)
-        print(f"Ticket: {ticket}")
-        print(f"Category: {category}")
-        print(f"→ Suggested Step: {suggestion}\n")
+    suggestion = resolve_ticket(
+        "I forgot my password and can't log into my laptop.",
+        "Password Reset",
+        sample_knowledge
+    )
+    print(f"Suggested Step: {suggestion}")

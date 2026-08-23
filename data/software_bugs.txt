@@ -1,0 +1,15 @@
+Software Issue Knowledge Base
+
+Application crashing on save:
+1. Check if the application has a pending update - update if available
+2. Clear the application's local cache/temp files
+3. Restart the application
+4. If crash persists, check available disk space (low disk space
+   commonly causes save failures)
+5. Collect error logs before escalating to the Application Support team
+
+General software troubleshooting:
+- Restart the application first
+- Restart the machine second
+- Check for pending OS updates third
+- Only escalate to L2 support if all above steps fail
