@@ -71,6 +71,7 @@ def submit_ticket(request: TicketRequest):
                        "Please make sure Ollama is running and try again."
             )
 
+
         # Catch-all for anything else unexpected, so we NEVER crash silently
         # or return a confusing raw Python traceback to the caller.
         raise HTTPException(
