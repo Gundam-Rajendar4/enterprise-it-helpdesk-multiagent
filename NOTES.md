@@ -150,6 +150,42 @@ uvicorn api.main:app --reload
 
 ---
 
+---
+
+## Day 6 — Error Handling + Documentation
+
+**README.md** — a public-facing doc explaining the project: architecture, tech stack, setup steps, usage, known limitations, and planned improvements. Different purpose from NOTES.md — README is for OTHERS (recruiters, interviewers, anyone visiting the repo); NOTES.md is for YOU (learning reference).
+
+**Pydantic `field_validator`** — a way to add custom validation rules to a request model. Runs automatically BEFORE your endpoint code executes.
+```python
+class TicketRequest(BaseModel):
+    ticket: str
+
+    @field_validator("ticket")
+    @classmethod
+    def ticket_must_not_be_empty(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("Ticket description cannot be empty.")
+        return value
+```
+Empty/blank input now gets rejected automatically with a clear 422 error, before the pipeline even runs.
+
+**`try/except` around the pipeline call** — catches failures (e.g., Ollama not running) so the app returns a clean error message instead of crashing.
+- FastAPI: raises `HTTPException(status_code=503, detail="...")` for service-unavailable, `500` for anything else unexpected.
+- Streamlit: shows `st.error("...")` instead of letting the raw crash/traceback show.
+
+**Important lesson learned:** don't assume a library raises Python's built-in exception classes (e.g., `ConnectionError`). Different libraries (Ollama's client, httpx, etc.) raise their OWN exception classes. When you don't know the exact class, catch broadly (`except Exception as e`) and check `str(e)` for known failure signatures instead of guessing the class name.
+
+**HTTP status codes to remember:**
+- `200` = success
+- `422` = validation error (bad input shape/content, caught before your code runs)
+- `500` = unexpected server-side error (something broke that we didn't specifically anticipate)
+- `503` = service unavailable (a dependency, like Ollama, isn't reachable)
+
+**Housekeeping:** always double check `git status` BEFORE `git add .` — caught a stray `README.md.pdf` file that snuck into a commit this way.
+
+---
+
 ## Full pipeline journey (fill this in from memory before each new day)
 
 User types ticket in ______ → clicks submit → data goes into ______ →
