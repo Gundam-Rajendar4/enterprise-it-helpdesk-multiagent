@@ -6,6 +6,16 @@ so the Resolver node knows whether to actually generate advice or
 return a "needs human review" message.
 """
 
+import logging
+
+logging.basicConfig(
+    filename="helpdesk.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 
@@ -25,11 +35,13 @@ class HelpdeskState(TypedDict):
 
 def triage_node(state: HelpdeskState) -> dict:
     category = triage_ticket(state["ticket"])
+    logging.info(f"TRIAGE | Ticket: '{state['ticket']}' | Category: {category}")
     return {"category": category}
 
 
 def knowledge_node(state: HelpdeskState) -> dict:
     result = retrieve_relevant_knowledge(state["ticket"])
+    logging.info(f"KNOWLEDGE | Distance: {result['distance']:.3f} | Relevant: {result['is_relevant']}")
     return {
         "knowledge": result["content"],
         "is_relevant": result["is_relevant"],
@@ -44,6 +56,7 @@ def resolver_node(state: HelpdeskState) -> dict:
         state["knowledge"],
         state["is_relevant"]
     )
+    logging.info(f"RESOLVER | Suggestion: {suggestion}")
     return {"suggestion": suggestion}
 
 
