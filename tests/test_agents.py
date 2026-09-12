@@ -31,10 +31,12 @@ def test_triage_hardware_issue():
 
 
 def test_knowledge_retrieval_returns_relevant_content():
-    """Retrieving knowledge for a password ticket should mention 'password'."""
+    """Retrieving knowledge for a password ticket should mention 'password'
+    and be correctly flagged as relevant."""
     load_knowledge_base()
     result = retrieve_relevant_knowledge("I forgot my password")
-    assert "password" in result.lower()
+    assert "password" in result["content"].lower()
+    assert result["is_relevant"] == True
 
 
 def test_resolver_returns_non_empty_suggestion():

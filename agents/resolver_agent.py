@@ -1,9 +1,10 @@
 """
 resolver_agent.py
 ------------------
-UPDATED for Day 3: Now uses retrieved knowledge (RAG) instead of relying
-purely on the LLM's raw training. This makes suggestions grounded in
-OUR company's actual documented procedures, not generic guesses.
+UPDATED (Day 8): now handles the case where NO relevant knowledge was
+found (is_relevant=False) by skipping the LLM call entirely and returning
+a clear "needs manual review" message - instead of asking the LLM to
+generate advice from irrelevant content.
 """
 
 from langchain_ollama import OllamaLLM
@@ -11,12 +12,18 @@ from langchain_ollama import OllamaLLM
 llm = OllamaLLM(model="llama3.2")
 
 
-def resolve_ticket(ticket_description: str, category: str, knowledge: str) -> str:
+def resolve_ticket(ticket_description: str, category: str, knowledge: str, is_relevant: bool = True) -> str:
     """
-    Takes the ticket, category, AND retrieved knowledge (from ChromaDB),
-    and suggests a resolution step GROUNDED in that knowledge - not just
-    the LLM guessing from memory.
+    Suggests a resolution step GROUNDED in retrieved knowledge.
+
+    If is_relevant is False, we don't even call the LLM - we know upfront
+    that we don't have good information, so there's no point asking the
+    LLM to guess. This saves an unnecessary LLM call AND avoids a
+    confidently-wrong answer.
     """
+    if not is_relevant:
+        return ("This ticket doesn't match any known issue in our knowledge "
+                "base. Please escalate to a human support agent for review.")
 
     prompt = f"""You are an IT Helpdesk resolution assistant.
 Use ONLY the knowledge base content below to suggest ONE clear first
@@ -38,14 +45,20 @@ Respond in ONE short sentence only. No explanations, no extra text."""
 
 
 if __name__ == "__main__":
-    sample_knowledge = """Password Reset Knowledge Base
-To reset a forgotten password, go to portal.company.com/reset and
-enter your registered work email. Never attempt repeated logins -
-accounts lock after 5 failed attempts."""
-
-    suggestion = resolve_ticket(
-        "I forgot my password and can't log into my laptop.",
+    # Test case 1: relevant knowledge available
+    suggestion1 = resolve_ticket(
+        "I forgot my password.",
         "Password Reset",
-        sample_knowledge
+        "Go to portal.company.com/reset to reset your password.",
+        is_relevant=True
     )
-    print(f"Suggested Step: {suggestion}")
+    print(f"Relevant case: {suggestion1}")
+
+    # Test case 2: no relevant knowledge found
+    suggestion2 = resolve_ticket(
+        "What's the weather today?",
+        "Other",
+        "",
+        is_relevant=False
+    )
+    print(f"Irrelevant case: {suggestion2}")

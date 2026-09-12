@@ -33,3 +33,10 @@ def test_full_pipeline_hardware_category():
     after flowing through the whole pipeline."""
     result = helpdesk_app.invoke({"ticket": "My laptop screen is cracked."})
     assert result["category"] == "Hardware Issue"
+
+def test_pipeline_flags_irrelevant_ticket():
+    """An unrelated ticket should be flagged as not relevant, and the
+    suggestion should point to human escalation rather than a guess."""
+    result = helpdesk_app.invoke({"ticket": "What's the weather like today?"})
+    assert result["is_relevant"] == False
+    assert "escalate" in result["suggestion"].lower()

@@ -1,12 +1,9 @@
 """
 helpdesk_graph.py
 ------------------
-UPDATED for Day 3: Now a 3-agent pipeline.
-
-Triage -> Knowledge Retrieval -> Resolver
-
-Each node reads what previous nodes wrote into State, and adds its own
-piece before passing along.
+UPDATED (Day 8): State now also carries `is_relevant` and `distance`,
+so the Resolver node knows whether to actually generate advice or
+return a "needs human review" message.
 """
 
 from typing import TypedDict
@@ -20,7 +17,9 @@ from agents.knowledge_agent import retrieve_relevant_knowledge
 class HelpdeskState(TypedDict):
     ticket: str
     category: str
-    knowledge: str      # NEW - retrieved knowledge base content
+    knowledge: str
+    is_relevant: bool      # NEW
+    distance: float         # NEW
     suggestion: str
 
 
@@ -30,15 +29,20 @@ def triage_node(state: HelpdeskState) -> dict:
 
 
 def knowledge_node(state: HelpdeskState) -> dict:
-    knowledge = retrieve_relevant_knowledge(state["ticket"])
-    return {"knowledge": knowledge}
+    result = retrieve_relevant_knowledge(state["ticket"])
+    return {
+        "knowledge": result["content"],
+        "is_relevant": result["is_relevant"],
+        "distance": result["distance"]
+    }
 
 
 def resolver_node(state: HelpdeskState) -> dict:
     suggestion = resolve_ticket(
         state["ticket"],
         state["category"],
-        state["knowledge"]
+        state["knowledge"],
+        state["is_relevant"]
     )
     return {"suggestion": suggestion}
 
@@ -60,13 +64,14 @@ helpdesk_app = graph_builder.compile()
 if __name__ == "__main__":
     test_tickets = [
         "I forgot my password and can't log into my laptop.",
-        "My monitor won't turn on even though it's plugged in.",
-        "The CRM app crashes every time I click 'Save'.",
+        "What's the weather like today?",
     ]
 
-    print("=== Full 3-Agent Helpdesk Pipeline ===\n")
+    print("=== Full Pipeline with Confidence Threshold ===\n")
     for ticket in test_tickets:
         result = helpdesk_app.invoke({"ticket": ticket})
         print(f"Ticket: {result['ticket']}")
         print(f"Category: {result['category']}")
-        print(f"Suggested Step: {result['suggestion']}\n")
+        print(f"Distance: {result['distance']:.3f}")
+        print(f"Is Relevant: {result['is_relevant']}")
+        print(f"Suggestion: {result['suggestion']}\n")
