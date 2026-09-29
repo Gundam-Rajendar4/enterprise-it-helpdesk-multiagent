@@ -17,6 +17,11 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 from graphs.helpdesk_graph import helpdesk_app
+from fastapi import Header, Depends
+from dotenv import load_dotenv
+
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
 
 logging.basicConfig(
     filename="helpdesk.log",
@@ -24,6 +29,10 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
+def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 app = FastAPI(
     title="IT Helpdesk Multi-Agent API",
@@ -42,9 +51,8 @@ class TicketRequest(BaseModel):
             raise ValueError("Ticket description cannot be empty.")
         return value
 
-
 @app.post("/submit-ticket")
-def submit_ticket(request: TicketRequest):
+def submit_ticket(request: TicketRequest, authorized: None = Depends(verify_api_key)):
     """
     Accepts a ticket description, runs it through the full agent pipeline,
     and returns category, retrieved knowledge, and suggested resolution.
