@@ -194,3 +194,37 @@ second agent (______) does ______ → third agent (______) does ______ →
 final result shown back in ______.
 
 (Answer key is in Day 2-5 sections above if you get stuck — but try from memory first!)
+
+## Day 10: API Key Authentication
+
+**Problem:** Anyone who knew our API's URL could call `/submit-ticket` freely — no protection at all.
+
+**Solution:** Added a simple API key check using FastAPI's `Header` and `Depends`.
+
+**Key concepts:**
+- `.env` file stores secrets (like `API_KEY=...`) outside of code, and is gitignored so it never gets pushed to GitHub
+- `load_dotenv()` (from `python-dotenv`) reads the `.env` file and loads its values into environment variables
+- `os.getenv("API_KEY")` retrieves that value in Python
+- `Header(...)` in FastAPI tells it to expect a specific header in incoming requests (here: `x-api-key`)
+- `Depends(verify_api_key)` wires a "check this first" function into an endpoint — if it raises an error, the endpoint's own code never runs at all
+
+**Our `verify_api_key` function:**
+```python
+def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+```
+
+**Applied to the endpoint:**
+```python
+@app.post("/submit-ticket")
+def submit_ticket(request: TicketRequest, authorized: None = Depends(verify_api_key)):
+```
+
+**Tested via `/docs`:**
+- Wrong/missing key → `401 Unauthorized` ✅
+- Correct key → `200 OK` with full response ✅
+
+**Lesson learned:** `.env` and `venv` are NOT the same thing — `.env` is a plain text secrets file, `venv` is the Python virtual environment folder. Easy to mix up the names.
+
+**Git gotcha:** Never paste the `(venv) PS C:\...>` prompt text itself into the terminal along with a command — PowerShell tries to run the whole thing as one line and throws a parser error. Only paste the actual command.
