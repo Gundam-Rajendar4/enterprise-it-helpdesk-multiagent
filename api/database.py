@@ -56,3 +56,18 @@ def update_ticket(ticket_id, category, suggestion, status):
     )
     conn.commit()
     conn.close()
+
+def get_all_tickets():
+    """Return every ticket, newest first."""
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM tickets ORDER BY id DESC").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_ticket(ticket_id):
+    """Return one ticket by id, or None if it doesn't exist."""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
