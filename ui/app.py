@@ -7,6 +7,9 @@ UPDATED: now handles errors gracefully -
 1. Empty/blank ticket submissions
 2. Ollama not running / LLM connection failures
 3. Any unexpected pipeline failure
+
+UPDATED (Day 11): tickets are saved to the SQLite database,
+and a ticket history table is shown below the form.
 """
 
 import sys
@@ -15,8 +18,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 from graphs.helpdesk_graph import helpdesk_app
+from api.database import init_db, create_ticket, update_ticket, get_all_tickets
 
 st.set_page_config(page_title="IT Helpdesk Multi-Agent System", page_icon="🎫")
+
+init_db()
 
 st.title("🎫 Enterprise IT Helpdesk Multi-Agent System")
 st.write("Describe your IT issue below, and our AI agent team will triage, "
@@ -32,10 +38,15 @@ if st.button("Submit Ticket"):
         st.warning("Please describe your issue before submitting.")
     else:
         try:
+            ticket_id = create_ticket(ticket_input)
+
             with st.spinner("Agents are working on your ticket..."):
                 result = helpdesk_app.invoke({"ticket": ticket_input})
 
-            st.success("Done! Here's what our agents found:")
+            status = "Resolved" if result["is_relevant"] else "Escalated"
+            update_ticket(ticket_id, result["category"], result["suggestion"], status)
+
+            st.success(f"Done! Ticket #{ticket_id} is {status}. Here's what our agents found:")
 
             st.subheader("📁 Category")
             st.write(result["category"])
@@ -55,3 +66,12 @@ if st.button("Submit Ticket"):
                 )
             else:
                 st.error(f"⚠️ Something went wrong while processing your ticket: {e}")
+
+st.divider()
+st.subheader("📋 Ticket History")
+
+tickets = get_all_tickets()
+if tickets:
+    st.dataframe(tickets)
+else:
+    st.info("No tickets yet.")
