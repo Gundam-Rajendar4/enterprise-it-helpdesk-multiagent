@@ -195,36 +195,129 @@ final result shown back in ______.
 
 (Answer key is in Day 2-5 sections above if you get stuck — but try from memory first!)
 
-## Day 10: API Key Authentication
+## Day 7: Automated Testing with pytest
 
-**Problem:** Anyone who knew our API's URL could call `/submit-ticket` freely — no protection at all.
+**Problem:** Every time we changed code, we had to check by hand that nothing broke.
 
-**Solution:** Added a simple API key check using FastAPI's `Header` and `Depends`.
+**Solution:** pytest runs checks automatically and reports pass or fail.
 
 **Key concepts:**
-- `.env` file stores secrets (like `API_KEY=...`) outside of code, and is gitignored so it never gets pushed to GitHub
-- `load_dotenv()` (from `python-dotenv`) reads the `.env` file and loads its values into environment variables
-- `os.getenv("API_KEY")` retrieves that value in Python
-- `Header(...)` in FastAPI tells it to expect a specific header in incoming requests (here: `x-api-key`)
-- `Depends(verify_api_key)` wires a "check this first" function into an endpoint — if it raises an error, the endpoint's own code never runs at all
+- A test is a function whose name starts with `test_`, and it uses `assert` to state what must be true
+- pytest finds files named `test_*.py` in the `tests/` folder automatically
+- `pytest -v` runs everything and lists each test with PASSED or FAILED
+- Tests give confidence to change code later, because a break shows up immediately
 
-**Our `verify_api_key` function:**
+**Our tests:**
+- `tests/test_agents.py`: triage (password reset, hardware), knowledge retrieval, resolver output
+- `tests/test_pipeline.py`: the full Triage → Knowledge → Resolver flow
+
+**Lesson learned:** Tests that call the LLM are slower and can vary slightly between runs, so we assert on stable things (the category, a non-empty answer) and not exact wording.
+
+## Day 8: RAG Confidence Threshold
+
+**Problem:** ChromaDB always returns its closest match, even when that match is far from the question. A ticket about lunch would still get some KB document, and the Resolver would write a confident but wrong answer.
+
+**Solution:** Added a distance check in `agents/knowledge_agent.py`.
+
+**Key concepts:**
+- Embeddings turn text into numbers, and ChromaDB measures the distance between them. Lower distance means a closer match
+- `DISTANCE_THRESHOLD = 1.0`, defined in `knowledge_agent.py`, not in the graph
+- Distance at or below 1.0: `is_relevant = True`. Distance above 1.0: `is_relevant = False`
+- Measured on real data: a relevant ticket scored about 0.697, and an irrelevant one about 1.881
+- `retrieve_relevant_knowledge()` now returns a dictionary: `content`, `is_relevant`, `distance`
+- When `is_relevant` is False, the Resolver skips the LLM call and returns an escalation message
+
+**Grounded:** the Resolver only builds answers from the knowledge base content, not from the model's general knowledge. The threshold protects this, because there is nothing to ground on when no good match exists.
+
+**Lesson learned:** Changing a return type (string to dictionary) broke an old test. After changing a function's output, re-run the tests.
+
+## Day 9: Logging
+
+**Problem:** When something failed, there was no record of what happened or when. The error message disappeared as soon as the screen closed.
+
+**Solution:** Added Python's built-in `logging` module, which writes records to a file called `helpdesk.log`.
+
+**Key concepts:**
+- `logging.basicConfig(filename="helpdesk.log", level=logging.INFO, format=...)` sets up the log file and the line format, once per program
+- `logging.info(...)` records routine activity. We use it in `helpdesk_graph.py`, one line per node (triage, knowledge, resolver)
+- `logging.error(...)` records something that actually failed. We use it in the `except` blocks of `api/main.py` (Ollama unavailable, unexpected error)
+- Log levels in order of seriousness: DEBUG, INFO, WARNING, ERROR, CRITICAL. Setting the level to INFO hides DEBUG lines
+- `logging.getLogger("httpx").setLevel(logging.WARNING)` silences a noisy library that was filling the log
+- `helpdesk.log` is generated data, not source code, so it is in `.gitignore`
+- Read the log in PowerShell with `type helpdesk.log`
+
+**Why it matters:** In a real system you can't watch the screen all day. The log lets you check what happened later, such as which ticket failed and why.
+
+**Lesson learned:** Write the ticket text and the error into the log line, not just "error occurred." A log line is only useful if it tells you which request failed and why.
+
+## Day 10: API Key Authentication
+
+**Problem:** Anyone who knew the API's URL could call `/submit-ticket` for free. There was no protection.
+
+**Solution:** An API key check using FastAPI's `Header` and `Depends`.
+
+**Key concepts:**
+- `.env` is a plain text file for secrets (`API_KEY=...`). It is in `.gitignore`, so it never reaches GitHub
+- `.env` and `venv` are different things: `.env` is the secrets file, `venv` is the Python environment folder
+- `load_dotenv()` (from `python-dotenv`) reads `.env`, and `os.getenv("API_KEY")` gets the value in Python
+- `Header(...)` tells FastAPI to expect a header, here `x-api-key`
+- `Depends(verify_api_key)` runs the check before the endpoint's own code. If the check raises an error, the endpoint never runs
+
+**The check:**
 ```python
 def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 ```
 
-**Applied to the endpoint:**
+**Applied to an endpoint:**
 ```python
 @app.post("/submit-ticket")
 def submit_ticket(request: TicketRequest, authorized: None = Depends(verify_api_key)):
 ```
 
-**Tested via `/docs`:**
-- Wrong/missing key → `401 Unauthorized` ✅
-- Correct key → `200 OK` with full response ✅
+**Results:**
+- Wrong key: 401 Unauthorized
+- Correct key: 200 OK
+- Header missing completely: 422, because `Header(...)` rejects it before our code runs (found while writing the tests)
 
-**Lesson learned:** `.env` and `venv` are NOT the same thing — `.env` is a plain text secrets file, `venv` is the Python virtual environment folder. Easy to mix up the names.
+**Git gotcha:** Don't paste the `(venv) PS C:\...>` prompt along with a command. PowerShell tries to run the whole line and gives a parser error.
 
-**Git gotcha:** Never paste the `(venv) PS C:\...>` prompt text itself into the terminal along with a command — PowerShell tries to run the whole thing as one line and throws a parser error. Only paste the actual command.
+## Day 11: Ticketing with SQLite
+
+**Problem:** The pipeline processed a ticket once and forgot it. A real helpdesk stores tickets and tracks their status.
+
+**Solution:** A local SQLite database, plus new endpoints and a ticket history table in the UI.
+
+**Key concepts:**
+- SQLite is a full database stored in one file (`helpdesk.db`). It needs no server, no install and no cost, because Python includes `sqlite3`
+- Source code is what you type by hand. Generated data is what the program creates while running. Generated data (`helpdesk.db`, `chroma_db/`, `helpdesk.log`) goes in `.gitignore`
+- `api/database.py` holds the helpers: `init_db`, `create_ticket`, `update_ticket`, `get_all_tickets`, `get_ticket`
+- `?` placeholders in SQL protect against SQL injection
+- Query it directly with SQL: `SELECT * FROM tickets ORDER BY id DESC`
+
+**Ticket flow in `POST /tickets` (and the Streamlit UI):**
+1. Save the ticket first with status Open, so it survives even if Ollama is down
+2. Run the AI pipeline
+3. Update the same row with category, suggestion and final status
+
+**Statuses:**
+- Open: saved, not yet processed, or the AI step failed
+- Resolved: the Knowledge agent found relevant content (`is_relevant` True)
+- Escalated: no relevant content (`is_relevant` False), so a human takes over
+
+**Endpoints (all need the API key):**
+- `POST /tickets`: create and process
+- `GET /tickets`: list all, newest first
+- `GET /tickets/{ticket_id}`: one ticket, or 404 if it doesn't exist
+
+**New HTTP status code:** 404 means "that thing doesn't exist."
+
+**UI:** `ui/app.py` saves each ticket, shows "Ticket #N is Resolved/Escalated", and ends with `st.dataframe(get_all_tickets())`. Streamlit reruns the whole file after each click, so the table refreshes by itself.
+
+**Tests added (15 total now):**
+- `tests/test_database.py`: 4 tests on a temporary database, using the `tmp_path` and `monkeypatch` fixtures, so the real `helpdesk.db` is never touched
+- `tests/test_auth.py`: 4 tests with FastAPI's `TestClient` (wrong key 401, missing key 422, correct key 200, missing ticket 404)
+- `pytest.ini` with `pythonpath = .` fixes "No module named 'api'" when running plain `pytest`
+
+**Lesson learned:** `python -m pytest` and `pytest` can behave differently, because only the first adds the current folder to Python's search path. A `pytest.ini` makes both work.
